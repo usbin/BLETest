@@ -25,7 +25,6 @@ import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.example.bluetoothdatatest.BluetoothLeService
-import com.example.bluetoothdatatest.SampleGattAttributes.CLIENT_CHARACTERISTIC_CONFIG
 import java.util.*
 
 /**
@@ -338,11 +337,13 @@ class BluetoothLeService : Service() {
         mBluetoothGatt?.writeCharacteristic(characteristic);
     }
     fun setCharacteristicNotification(characteristic: BluetoothGattCharacteristic, enable : Boolean){
-        mBluetoothGatt?.setCharacteristicNotification(characteristic, enable);
-        val descriptor = characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG).apply{
-            value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+        if(mBluetoothGatt == null || mBluetoothAdapter == null){
+            Log.w(TAG, "BluetoothAdapter not initialized.")
+            return;
         }
-        mBluetoothGatt?.writeDescriptor(descriptor);
+        mBluetoothGatt?.setCharacteristicNotification(characteristic, enable);
+
+        
     }
 
     /**
@@ -367,7 +368,7 @@ class BluetoothLeService : Service() {
         const val ACTION_DATA_AVAILABLE = "com.example.bluetooth.le.ACTION_DATA_AVAILABLE"
         val UUID_DATA_WRITE = UUID.fromString("0000fff1-0000-1000-80000-00805f9b34fb");
         val UUID_DATA_NOTIFY = UUID.fromString("0000fff2-0000-1000-80000-00805f9b34fb");
-        val CLIENT_CHARACTERISTIC_CONFIG = UUID.fromString("00002902-0000-1000-80000-00805f9b34fb");
+        val CLIENT_CHARACTERISTIC_CONFIG = UUID.fromString("0000aaa0-0000-1000-8000-00805f9b34fb");
         const val EXTRA_DATA = "com.example.bluetooth.le.EXTRA_DATA"
         val UUID_HEART_RATE_MEASUREMENT =
             UUID.fromString(SampleGattAttributes.HEART_RATE_MEASUREMENT)

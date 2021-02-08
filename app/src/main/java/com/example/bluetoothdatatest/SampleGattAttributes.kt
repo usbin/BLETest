@@ -24,7 +24,6 @@ object SampleGattAttributes {
     private val attributes: HashMap<String, String> =
         HashMap<String, String>()
     var HEART_RATE_MEASUREMENT = "00002a37-0000-1000-8000-00805f9b34fb"
-    var CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb"
     fun lookup(uuid: String?, defaultName: String): String {
         val name = attributes[uuid]
         return name ?: defaultName

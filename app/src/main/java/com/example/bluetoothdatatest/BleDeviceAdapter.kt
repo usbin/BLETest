@@ -48,6 +48,7 @@ class BleDeviceAdapter(private val context : Context) : RecyclerView.Adapter<Ble
             Log.d("ble", "add device that not contained. ${bleDeviceList.size}")
             bleDeviceList.add(device)
             notifyDataSetChanged()
+            Log.d("rv_main", "${itemCount}")
         }
 
     }

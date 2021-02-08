@@ -58,7 +58,8 @@ class DeviceControlActivity : AppCompatActivity(){
         @RequiresApi(Build.VERSION_CODES.M)
         override fun onServiceConnected(componentName: ComponentName, service: IBinder) {
             bluetoothService = (service as BluetoothLeService.LocalBinder).service
-            if (!bluetoothService?.initialize()!!) {
+            Log.d("chara", "onServiceConnected : bluetoothService : ${bluetoothService}")
+            if (!bluetoothService!!.initialize()!!) {
                 Log.e(TAG, "Unable to initialize Bluetooth")
 
                 loadingDialog.dismiss();
@@ -66,7 +67,7 @@ class DeviceControlActivity : AppCompatActivity(){
             }
 
             // Automatically connects to the device upon successful start-up initialization.
-            bluetoothService?.connect(deviceAddress)
+            Log.d("chara", "connecting... ${bluetoothService?.connect(deviceAddress)}");
 
         }
 
@@ -94,7 +95,7 @@ class DeviceControlActivity : AppCompatActivity(){
                     handler.removeCallbacks(autoStopConnecting)
                     Log.d("thread", "is Disconnected, remove autoStopConnecting")
 
-                    Toast.makeText(this@DeviceControlActivity, R.string.ble_device_disconnected, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@DeviceControlActivity, "ble_device_disconnected", Toast.LENGTH_SHORT).show()
 
                 }
                 BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED -> {
@@ -104,6 +105,7 @@ class DeviceControlActivity : AppCompatActivity(){
                     Log.d("thread", "is connected, remove autoStopConnecting")
                 }
                 BluetoothLeService.ACTION_DATA_AVAILABLE -> {
+                    Log.d("chara", "get string extra - ${intent.getStringExtra(BluetoothLeService.EXTRA_DATA)}");
                     displayData(intent.getStringExtra(BluetoothLeService.EXTRA_DATA))
                 }
             }
@@ -226,16 +228,19 @@ class DeviceControlActivity : AppCompatActivity(){
         bluetoothService = null
     }
 
+    //특성 클릭 리스너
     private val servicesListClickListener =
         OnChildClickListener { parent, v, groupPosition, childPosition, id ->
+            //특성 클릭하면 해당 데이터 값 읽어옴.
             if(gattCharacteristics != null){
                 val characteristic: BluetoothGattCharacteristic? =
-                    gattCharacteristics!!.get(groupPosition).get(childPosition)
+                    gattCharacteristics!![groupPosition][childPosition]
                 val charaProp = characteristic?.properties
                 if (charaProp != null) {
                     if (charaProp or BluetoothGattCharacteristic.PROPERTY_READ > 0) {
                         // If there is an active notification on a characteristic, clear
                         // it first so it doesn't update the data field on the user interface.
+                        Log.d("charaListener", "onClick listener, bluetoothService : ${bluetoothService}")
                         if (notifyCharacteristic != null) {
                             bluetoothService?.setCharacteristicNotification(
                                 notifyCharacteristic!!, false
@@ -244,11 +249,10 @@ class DeviceControlActivity : AppCompatActivity(){
                         }
                        bluetoothService?.readCharacteristic(characteristic)
                     }
-                }
-                if (charaProp != null) {
                     if (charaProp or BluetoothGattCharacteristic.PROPERTY_NOTIFY > 0) {
                         notifyCharacteristic = characteristic
-                        bluetoothService?.setCharacteristicNotification(
+                        Log.d("chara", "onClickListener, bluetoothService : ${bluetoothService}, characteristic : ${characteristic}")
+                        bluetoothService!!.setCharacteristicNotification(
                             characteristic, true
                         )
                     }
@@ -298,8 +302,10 @@ class DeviceControlActivity : AppCompatActivity(){
             currentServiceData[LIST_NAME] = SampleGattAttributes.lookup(uuid, unknownServiceString)
             currentServiceData[LIST_UUID] = uuid
             gattServiceData.add(currentServiceData)
+            //특성 그룹 데이터
             val gattCharacteristicGroupData =
                 ArrayList<HashMap<String, String?>>()
+            //해당 서비스 안의 모든 특성들.
             val gattCharacteristicsLocal = gattService.characteristics
             val charas =
                 ArrayList<BluetoothGattCharacteristic>()
