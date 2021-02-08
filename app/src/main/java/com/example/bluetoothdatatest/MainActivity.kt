@@ -14,6 +14,8 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -40,6 +42,11 @@ class MainActivity : AppCompatActivity() {
     private val SCAN_PERIOD : Long = 10000
     private var scanning : Boolean = false
     private val handler = Handler() //핸들러 생성
+    val requestActivity : ActivityResultLauncher<Intent> = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ){  activityResult ->
+
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,8 +54,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         setSupportActionBar(findViewById(R.id.toolbar))
         checkPermission()
-        supportActionBar!!.setDisplayHomeAsUpEnabled(true)
-
+        //supportActionBar!!.setDisplayHomeAsUpEnabled(true)
         //BLE 지원 여부 체크 후 지원하지 않으면 어플 종료.
         packageManager.takeIf { it.missingSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)}?.also{
             Toast.makeText(this, R.string.ble_not_supported, Toast.LENGTH_SHORT).show()
@@ -65,12 +71,16 @@ class MainActivity : AppCompatActivity() {
         bluetoothAdapter.takeIf{ it.isDisabled }?.apply {
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
             //첫번째 인자:시작할 intent //두번째 인자:intent를 요청한 위치 식별용 id
-            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
+           startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
+
         }
 
         //리사이클러뷰 초기화 코드
         rvAdapter.notifyDataSetChanged()
+        rvAdapter.scanning = this.scanning;
+        rvAdapter.mainContext = this;
         rvDeviceList.adapter = rvAdapter
+
         //리사이클러뷰 구분선 추가
         rvDeviceList.addItemDecoration(DividerItemDecoration(this, LinearLayoutManager.VERTICAL))
         scanBleDevice(true)
@@ -136,10 +146,12 @@ class MainActivity : AppCompatActivity() {
         if(enable){
             handler.postDelayed({
                 scanning = false
+                rvAdapter.scanning = this.scanning;
                 bluetoothAdapter.bluetoothLeScanner.stopScan(scanCallback)
                 invalidateOptionsMenu()
             }, SCAN_PERIOD)
             scanning = true
+            rvAdapter.scanning = this.scanning;
             rvAdapter.clear()
             bluetoothAdapter.bluetoothLeScanner.startScan(scanCallback)
             invalidateOptionsMenu()
@@ -147,6 +159,7 @@ class MainActivity : AppCompatActivity() {
         }
         else {
             scanning = false
+            rvAdapter.scanning = this.scanning;
             bluetoothAdapter.bluetoothLeScanner.stopScan(scanCallback)
             invalidateOptionsMenu()
         }

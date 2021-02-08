@@ -20,9 +20,12 @@ import android.bluetooth.*
 import android.content.Context
 import android.content.Intent
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresApi
 import com.example.bluetoothdatatest.BluetoothLeService
+import com.example.bluetoothdatatest.SampleGattAttributes.CLIENT_CHARACTERISTIC_CONFIG
 import java.util.*
 
 /**
@@ -35,7 +38,7 @@ class BluetoothLeService : Service() {
     private var mBluetoothDeviceAddress: String? = null
     private var mBluetoothGatt: BluetoothGatt? = null
     private var mConnectionState = STATE_DISCONNECTED
-
+    lateinit var context : Context;
     // Implements callback methods for GATT events that the app cares about.  For example,
     // connection change and services discovered.
     private val mGattCallback: BluetoothGattCallback = object : BluetoothGattCallback() {
@@ -44,7 +47,9 @@ class BluetoothLeService : Service() {
             status: Int,
             newState: Int
         ) {
+            //블루투스의 상태가 변경되거나 서비스, 특성이 발견될 경우 해야 할 기능 지정
             val intentAction: String
+            Log.d("bluetoothConnection", "gattCB- ${status}, ${newState}")
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 intentAction = ACTION_GATT_CONNECTED
                 mConnectionState = STATE_CONNECTED
@@ -54,6 +59,7 @@ class BluetoothLeService : Service() {
                 Log.i(
                     TAG, "Attempting to start service discovery:" +
                             mBluetoothGatt!!.discoverServices()
+
                 )
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 intentAction = ACTION_GATT_DISCONNECTED
@@ -109,7 +115,16 @@ class BluetoothLeService : Service() {
         // This is special handling for the Heart Rate Measurement profile.  Data parsing is
         // carried out as per profile specifications:
         // http://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.heart_rate_measurement.xml
-        if (UUID_HEART_RATE_MEASUREMENT == characteristic.uuid) {
+        characteristic?.let{
+            when(characteristic.uuid){
+                UUID_DATA_NOTIFY -> {
+                    val data: String = getString(0);
+                    intent.putExtra(EXTRA_DATA, data)
+                }
+                else-> {Log.d("broadcastUpdate", String.format("%s", characteristic.value.toString()))}
+            }
+        }
+        /*if (UUID_HEART_RATE_MEASUREMENT == characteristic.uuid) {
             val flag = characteristic.properties
             var format = -1
             if (flag and 0x01 != 0) {
@@ -144,7 +159,7 @@ class BluetoothLeService : Service() {
                         """.trimIndent()
                 )
             }
-        }
+        }*/
         sendBroadcast(intent)
     }
 
@@ -207,7 +222,9 @@ class BluetoothLeService : Service() {
      * `BluetoothGattCallback#onConnectionStateChange(android.bluetooth.BluetoothGatt, int, int)`
      * callback.
      */
+    @RequiresApi(Build.VERSION_CODES.M)
     fun connect(address: String?): Boolean {
+
         if (mBluetoothAdapter == null || address == null) {
             Log.w(
                 TAG,
@@ -217,12 +234,14 @@ class BluetoothLeService : Service() {
         }
 
         // Previously connected device.  Try to reconnect.
+
         if (mBluetoothDeviceAddress != null && address == mBluetoothDeviceAddress && mBluetoothGatt != null) {
             Log.d(
                 TAG,
                 "Trying to use an existing mBluetoothGatt for connection."
             )
             return if (mBluetoothGatt!!.connect()) {
+                Log.d("bluetoothConnect", "connect origin success.")
                 mConnectionState = STATE_CONNECTING
                 true
             } else {
@@ -239,10 +258,11 @@ class BluetoothLeService : Service() {
         }
         // We want to directly connect to the device, so we are setting the autoConnect
         // parameter to false.
-        mBluetoothGatt = device.connectGatt(this, false, mGattCallback)
+        mBluetoothGatt = device.connectGatt(this, false, mGattCallback, BluetoothDevice.TRANSPORT_LE)
         Log.d(TAG, "Trying to create a new connection.")
         mBluetoothDeviceAddress = address
         mConnectionState = STATE_CONNECTING
+
         return true
     }
 
@@ -292,25 +312,37 @@ class BluetoothLeService : Service() {
      *
      * @param characteristic Characteristic to act on.
      * @param enabled If true, enable notification.  False otherwise.
-     */
-    fun setCharacteristicNotification(
-        characteristic: BluetoothGattCharacteristic,
-        enabled: Boolean
-    ) {
-        if (mBluetoothAdapter == null || mBluetoothGatt == null) {
-            Log.w(TAG, "BluetoothAdapter not initialized")
-            return
+    //     */
+//    fun setCharacteristicNotification(
+//        characteristic: BluetoothGattCharacteristic,
+//        enabled: Boolean
+//    ) {
+//        if (mBluetoothAdapter == null || mBluetoothGatt == null) {
+//            Log.w(TAG, "BluetoothAdapter not initialized")
+//            return
+//        }
+//        mBluetoothGatt!!.setCharacteristicNotification(characteristic, enabled)
+//
+//        // This is specific to Heart Rate Measurement.
+//        if (UUID_HEART_RATE_MEASUREMENT == characteristic.uuid) {
+//            val descriptor = characteristic.getDescriptor(
+//                UUID.fromString(SampleGattAttributes.CLIENT_CHARACTERISTIC_CONFIG)
+//            )
+//            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+//            mBluetoothGatt!!.writeDescriptor(descriptor)
+//        }
+//    }
+    fun writeCharacteristic(characteristic: BluetoothGattCharacteristic, data: String){
+        characteristic.setValue(data);
+        characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+        mBluetoothGatt?.writeCharacteristic(characteristic);
+    }
+    fun setCharacteristicNotification(characteristic: BluetoothGattCharacteristic, enable : Boolean){
+        mBluetoothGatt?.setCharacteristicNotification(characteristic, enable);
+        val descriptor = characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG).apply{
+            value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
         }
-        mBluetoothGatt!!.setCharacteristicNotification(characteristic, enabled)
-
-        // This is specific to Heart Rate Measurement.
-        if (UUID_HEART_RATE_MEASUREMENT == characteristic.uuid) {
-            val descriptor = characteristic.getDescriptor(
-                UUID.fromString(SampleGattAttributes.CLIENT_CHARACTERISTIC_CONFIG)
-            )
-            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            mBluetoothGatt!!.writeDescriptor(descriptor)
-        }
+        mBluetoothGatt?.writeDescriptor(descriptor);
     }
 
     /**
@@ -333,6 +365,9 @@ class BluetoothLeService : Service() {
         const val ACTION_GATT_SERVICES_DISCOVERED =
             "com.example.bluetooth.le.ACTION_GATT_SERVICES_DISCOVERED"
         const val ACTION_DATA_AVAILABLE = "com.example.bluetooth.le.ACTION_DATA_AVAILABLE"
+        val UUID_DATA_WRITE = UUID.fromString("0000fff1-0000-1000-80000-00805f9b34fb");
+        val UUID_DATA_NOTIFY = UUID.fromString("0000fff2-0000-1000-80000-00805f9b34fb");
+        val CLIENT_CHARACTERISTIC_CONFIG = UUID.fromString("00002902-0000-1000-80000-00805f9b34fb");
         const val EXTRA_DATA = "com.example.bluetooth.le.EXTRA_DATA"
         val UUID_HEART_RATE_MEASUREMENT =
             UUID.fromString(SampleGattAttributes.HEART_RATE_MEASUREMENT)
